@@ -1,5 +1,17 @@
 # @Shrimadhav Uk | @LISA_FAN_LK
+import os
 
+def split_file(file_path, max_size=2000 * 1024 * 1024):
+    """Splits a file into multiple smaller files."""
+    with open(file_path, "rb") as f:
+        file_name = os.path.basename(file_path)
+        part_num = 1
+        while chunk := f.read(max_size):
+            part_file_name = f"{file_name}.part{part_num}"
+            with open(part_file_name, "wb") as part_file:
+                part_file.write(chunk)
+            part_num += 1
+    return [f"{file_name}.part{num}" for num in range(1, part_num)]
 import logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -106,28 +118,43 @@ async def ddl_call_back(bot, update):
             # https://stackoverflow.com/a/678242/4723940
             file_size = os.stat(download_directory).st_size
         if file_size > Config.TG_MAX_FILE_SIZE:
-            await update.message.edit_caption(
-                
-                caption=Translation.RCHD_TG_API_LIMIT,
-                parse_mode=enums.ParseMode.HTML
+    # If file size exceeds the limit, split it
+    split_files = split_file(download_directory)
+
+    # Upload the split files one by one
+    for split_file_path in split_files:
+        await update.message.reply_document(
+            document=split_file_path,
+            caption=description,
+            parse_mode=enums.ParseMode.HTML,
+            progress=progress_for_pyrogram,
+            progress_args=(
+                Translation.UPLOAD_START,
+                update.message,
+                start_time
             )
-        else:
-            
-            start_time = time.time()
-            if (await db.get_upload_as_doc(update.from_user.id)) is False:
-                thumbnail = await Gthumb01(bot, update)
-                await update.message.reply_document(
-                    document=download_directory,
-                    thumb=thumbnail,
-                    caption=description,
-                    parse_mode=enums.ParseMode.HTML,
-                    progress=progress_for_pyrogram,
-                    progress_args=(
-                        Translation.UPLOAD_START,
-                        update.message,
-                        start_time
-                    )
-                )
+        )
+
+    # Optionally, remove the split files after uploading
+    for split_file_path in split_files:
+        os.remove(split_file_path)
+else:
+    # Proceed with the regular upload for smaller files
+    start_time = time.time()
+    if (await db.get_upload_as_doc(update.from_user.id)) is False:
+        thumbnail = await Gthumb01(bot, update)
+        await update.message.reply_document(
+            document=download_directory,
+            thumb=thumbnail,
+            caption=description,
+            parse_mode=enums.ParseMode.HTML,
+            progress=progress_for_pyrogram,
+            progress_args=(
+                Translation.UPLOAD_START,
+                update.message,
+                start_time
+            )
+        )
             else:
                  width, height, duration = await Mdata01(download_directory)
                  thumb_image_path = await Gthumb02(bot, update, duration, download_directory)
