@@ -190,9 +190,5 @@ async def download_coroutine(bot, session, url, file_name, chat_id, message_id, 
                     except Exception as e:
                         logger.info(str(e))
         return await response.release()
-      
 
-# Write to file
-final_script_path = Path("/mnt/data/ddl_with_file_split_support_fixed.py")
-final_script_path.write_text(full_corrected_code)
-final_script_path
+  
