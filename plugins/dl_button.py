@@ -251,4 +251,140 @@ ETA: {}""".format(
                     except Exception as e:
                         logger.info(str(e))
                         pass
+        return await response.release()(bot, update)
+                await update.message.reply_document(
+                    document=download_directory,
+                    thumb=thumbnail,
+                    caption=description,
+                    parse_mode=enums.ParseMode.HTML,
+                    progress=progress_for_pyrogram,
+                    progress_args=(
+                        Translation.UPLOAD_START,
+                        update.message,
+                        start_time
+                    )
+                )
+            else:
+                 width, height, duration = await Mdata01(download_directory)
+                 thumb_image_path = await Gthumb02(bot, update, duration, download_directory)
+                 await update.message.reply_video(
+                    video=download_directory,
+                    caption=description,
+                    duration=duration,
+                    width=width,
+                    height=height,
+                    supports_streaming=True,
+                    parse_mode=enums.ParseMode.HTML,
+                    thumb=thumb_image_path,
+                    progress=progress_for_pyrogram,
+                    progress_args=(
+                        Translation.UPLOAD_START,
+                        update.message,
+                        start_time
+                    )
+                )
+            if tg_send_type == "audio":
+                duration = await Mdata03(download_directory)
+                thumbnail = await Gthumb01(bot, update)
+                await update.message.reply_audio(
+                    audio=download_directory,
+                    caption=description,
+                    parse_mode=enums.ParseMode.HTML,
+                    duration=duration,
+                    thumb=thumbnail,
+                    progress=progress_for_pyrogram,
+                    progress_args=(
+                        Translation.UPLOAD_START,
+                        update.message,
+                        start_time
+                    )
+                )
+            elif tg_send_type == "vm":
+                width, duration = await Mdata02(download_directory)
+                thumbnail = await Gthumb02(bot, update, duration, download_directory)
+                await update.message.reply_video_note(
+                    video_note=download_directory,
+                    duration=duration,
+                    length=width,
+                    thumb=thumbnail,
+                    progress=progress_for_pyrogram,
+                    progress_args=(
+                        Translation.UPLOAD_START,
+                        update.message,
+                        start_time
+                    )
+                )
+            else:
+                logger.info("Did this happen? :\\")
+            end_two = datetime.now()
+            try:
+                os.remove(download_directory)
+                os.remove(thumb_image_path)
+            except:
+                pass
+            time_taken_for_download = (end_one - start).seconds
+            time_taken_for_upload = (end_two - end_one).seconds
+            await update.message.edit_caption(
+                caption=Translation.AFTER_SUCCESSFUL_UPLOAD_MSG_WITH_TS.format(time_taken_for_download, time_taken_for_upload),
+               
+                parse_mode=enums.ParseMode.HTML
+            )
+    else:
+        await update.message.edit_caption(
+            caption=Translation.NO_VOID_FORMAT_FOUND.format("Incorrect Link"),
+            parse_mode=enums.ParseMode.HTML
+        )
+
+async def download_coroutine(bot, session, url, file_name, chat_id, message_id, start):
+    downloaded = 0
+    display_message = ""
+    async with session.get(url, timeout=Config.PROCESS_MAX_TIMEOUT) as response:
+        total_length = int(response.headers["Content-Length"])
+        content_type = response.headers["Content-Type"]
+        if "text" in content_type and total_length < 500:
+            return await response.release()
+        await bot.edit_message_text(
+            chat_id,
+            message_id,
+            text="""Initiating Download
+URL: {}
+File Size: {}""".format(url, humanbytes(total_length))
+        )
+        with open(file_name, "wb") as f_handle:
+            while True:
+                chunk = await response.content.read(Config.CHUNK_SIZE)
+                if not chunk:
+                    break
+                f_handle.write(chunk)
+                downloaded += Config.CHUNK_SIZE
+                now = time.time()
+                diff = now - start
+                if round(diff % 5.00) == 0 or downloaded == total_length:
+                    percentage = downloaded * 100 / total_length
+                    speed = downloaded / diff
+                    elapsed_time = round(diff) * 1000
+                    time_to_completion = round(
+                        (total_length - downloaded) / speed) * 1000
+                    estimated_total_time = elapsed_time + time_to_completion
+                    try:
+                        current_message = """**Download Status**
+URL: {}
+File Size: {}
+Downloaded: {}
+ETA: {}""".format(
+    url,
+    humanbytes(total_length),
+    humanbytes(downloaded),
+    TimeFormatter(estimated_total_time)
+)
+                        if current_message != display_message:
+                            await bot.edit_message_text(
+                                chat_id,
+                                message_id,
+                                text=current_message
+                            )
+                            display_message = current_message
+                    except Exception as e:
+                        logger.info(str(e))
+                        pass
         return await response.release()
